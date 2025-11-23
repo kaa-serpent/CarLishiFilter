@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Vehicle Key Filter — Card View</title>
+
+<style>
+:root{
+  --bg:#f6f7fb;
+  --card:#ffffff;
+  --muted:#6b7280;
+  --accent:#0f6cff;
+  --border:#e6e9ef;
+  --shadow: 0 6px 18px rgba(15,20,40,0.06);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+html,body{margin:0;padding:0;background:var(--bg);color:#0b1220;}
+.container{max-width:800px;margin:36px auto;padding:20px;}
+@media (max-width: 800px) {
+  .container {
+    margin: 12px;
+  }
+}
+.card{background:var(--card);border-radius:12px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:16px;}
+
+.filters{
+  display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;
+}
+.filter-item{position:relative;flex:1 1 250px;}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+input[type="search"]{
+  width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid var(--border);
+  outline:none;font-size:14px;background:transparent;transition:box-shadow .12s, border-color .12s;
+}
+input[type="search"]:focus{box-shadow:0 4px 14px rgba(15,108,255,0.08);border-color:var(--accent);}
+
+.suggestions{
+  position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--card);
+  border-radius:10px;border:1px solid var(--border);max-height:240px;overflow:auto;z-index:40;
+  box-shadow:0 8px 24px rgba(6,12,30,0.08);display:none;
+}
+.suggestions.show{display:block;}
+.suggestions .item{padding:8px 12px;cursor:pointer;font-size:14px;}
+.suggestions .item:hover,
+.suggestions .item.active{background:linear-gradient(90deg,rgba(15,108,255,0.06),rgba(15,108,255,0.02));color:var(--accent);}
+
+.controls{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.btn{padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:#fbfcff;cursor:pointer;font-size:14px;}
+.btn:active{transform:translateY(1px);}
+
+.result-card{padding:16px;margin-bottom:16px;background:var(--card);border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border);}
+.result-card h3{margin:0 0 8px 0;font-size:18px;}
+.result-card p{margin:2px 0;color:#333;font-size:14px;}
+.result-card .muted{color:var(--muted);font-size:13px;}
+
+@media (max-width:350px){
+  .container{
+    padding:10px;
+  }
+  .filters{
+    flex-direction:column;
+    gap:10px; /* reduce vertical space between inputs */
+  }
+  .filter-item{
+    width:100%;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="controls">
+    <h2 style="margin:0;font-size:20px;">Vehicle Key Filter</h2>
+    <button id="clearBtn" class="btn" title="Clear filters">Clear</button>
+  </div>
+
+  <div class="filters">
+    <div class="filter-item">
+      <label for="brandInput">Marque (brand)</label>
+      <input id="brandInput" type="search" autocomplete="off" placeholder="Type a brand..." />
+      <div id="brandSuggestions" class="suggestions" role="listbox"></div>
+    </div>
+
+    <div class="filter-item">
+      <label for="modelInput">Modèle (model)</label>
+      <input id="modelInput" type="search" autocomplete="off" placeholder="Type a model..." />
+      <div id="modelSuggestions" class="suggestions" role="listbox"></div>
+    </div>
+  </div>
+
+  <div id="resultsContainer"></div>
+</div>
+
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+const $ = s=>document.querySelector(s);
+const $$ = s=>Array.from(document.querySelectorAll(s));
+const baseURL = 'https://lien-fictif.com/';
+function escapeHtml(s){return s==null?'':String(s);}
+function debounce(fn, wait=150){let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; }
+function rankAndSlice(list, term, limit=12){
+  if(!term) return list.slice(0,limit);
+  const t=term.trim().toLowerCase(),starts=[],includes=[];
+  for(const item of list){
+    const l=item.toLowerCase();
+    if(l.startsWith(t)) starts.push(item);
+    else if(l.includes(t)) includes.push(item);
+  }
+  return starts.concat(includes).slice(0,limit);
+}
+
+let data=[],brands=[],allModels=[],modelsByBrand={};
+const brandInput=$('#brandInput'),modelInput=$('#modelInput');
+const brandSug=$('#brandSuggestions'),modelSug=$('#modelSuggestions');
+const resultsContainer=$('#resultsContainer');
+const clearBtn=$('#clearBtn');
+
+function loadCSV(){
+  Papa.parse('data.csv',{download:true,header:true,skipEmptyLines:true,
+    complete:res=>{
+      data=res.data.map(r=>normalizeRow(r));
+      buildIndexes();
+      renderResults();
+    },
+    error:err=>{
+      resultsContainer.innerHTML='<div class="muted">CSV load error. Check file exists.</div>';
+      console.error(err);
+    }
+  });
+}
+function normalizeRow(r){
+  const cols=['marque_vehicule','modele_vehicule','lishi','t3','ic_card','silca_card','silca_key_blank','ilca_key_blank','ilco_key_blank','keyline_key_blank','jma_key_blank'];
+  const out={};
+  for(const c of cols) out[c]=(r[c]||'').trim();
+  return out;
+}
+function buildIndexes(){
+  const bset=new Set(),mset=new Set();
+  modelsByBrand={};
+  for(const row of data){
+    const b=row.marque_vehicule||'',m=row.modele_vehicule||'';
+    if(b) bset.add(b);
+    if(m) mset.add(m);
+    if(!modelsByBrand[b]) modelsByBrand[b]=new Set();
+    if(m) modelsByBrand[b].add(m);
+  }
+  brands=Array.from(bset).sort((a,b)=>a.localeCompare(b));
+  allModels=Array.from(mset).sort((a,b)=>a.localeCompare(b));
+  for(const k in modelsByBrand) modelsByBrand[k]=Array.from(modelsByBrand[k]).sort((a,b)=>a.localeCompare(b));
+}
+
+function computeModelPool(brandTyped){
+  const t = (brandTyped || '').trim().toLowerCase();
+  if(!t) return allModels;
+  const exact = brands.find(b => b.toLowerCase() === t); // case-insensitive match
+  if(exact) return modelsByBrand[exact] || [];
+  const matchingBrands = brands.filter(b => b.toLowerCase().includes(t));
+  if(matchingBrands.length === 0) return allModels.filter(m => m.toLowerCase().includes(t));
+  const set = new Set();
+  for(const b of matchingBrands) for(const m of modelsByBrand[b] || []) set.add(m);
+  return Array.from(set).sort((a,b)=>a.localeCompare(b));
+}
+
+function renderSuggestions(container,items,activeIndex=-1){
+  container.innerHTML='';
+  if(!items||!items.length){container.classList.remove('show');return;}
+  for(let i=0;i<items.length;i++){
+    const div=document.createElement('div'); div.className='item'+(i===activeIndex?' active':''); div.textContent=items[i]; div.dataset.index=i;
+    container.appendChild(div);
+  }
+  container.classList.add('show');
+}
+
+function wireAutocomplete(inputEl,sugEl,getCandidatesFn,onSelect){
+  let candidates=[],currentIndex=-1;
+  function close(){sugEl.classList.remove('show');candidates=[];currentIndex=-1;}
+  function open(list){candidates=list;currentIndex=-1;renderSuggestions(sugEl,candidates,currentIndex);}
+  sugEl.addEventListener('click',ev=>{
+    const it=ev.target.closest('.item'); if(!it) return;
+    const idx=Number(it.dataset.index); onSelect(candidates[idx]||''); close(); inputEl.focus();
+  });
+  sugEl.addEventListener('mousemove',ev=>{
+    const it=ev.target.closest('.item'); if(!it) return;
+    const idx=Number(it.dataset.index);
+    $$('.suggestions .item').forEach(i=>i.classList.remove('active'));
+    const hit=sugEl.querySelector(`.item[data-index="${idx}"]`); if(hit) hit.classList.add('active');
+    currentIndex=idx;
+  });
+  inputEl.addEventListener('keydown',ev=>{
+    if(!sugEl.classList.contains('show')) return;
+    const items=sugEl.querySelectorAll('.item'); if(!items.length) return;
+    if(ev.key==='ArrowDown'){ev.preventDefault();currentIndex=(currentIndex+1)%items.length;items.forEach(i=>i.classList.remove('active'));items[currentIndex].classList.add('active');items[currentIndex].scrollIntoView({block:'nearest'});}
+    else if(ev.key==='ArrowUp'){ev.preventDefault();currentIndex=(currentIndex-1+items.length)%items.length;items.forEach(i=>i.classList.remove('active'));items[currentIndex].classList.add('active');items[currentIndex].scrollIntoView({block:'nearest'});}
+    else if(ev.key==='Enter'){ev.preventDefault();if(currentIndex>=0 && currentIndex<candidates.length){onSelect(candidates[currentIndex]);}else{onSelect(inputEl.value.trim());} close(); renderResults();}
+    else if(ev.key==='Escape'){close();}
+  });
+  const onInput=debounce(()=>{const term=inputEl.value; const pool=getCandidatesFn(term); const ranked=rankAndSlice(pool,term,12); if(ranked.length) open(ranked);else close();},80);
+  inputEl.addEventListener('input',onInput);
+  document.addEventListener('click',ev=>{if(!inputEl.contains(ev.target)&&!sugEl.contains(ev.target)) close();});
+  return {close,open:(list)=>open(list)};
+}
+
+function filterData(){
+  const brandQ = (brandInput.value || '').trim().toLowerCase();
+  const modelQ = (modelInput.value || '').trim().toLowerCase();
+
+  return data.filter(row=>{
+    const b = (row.marque_vehicule || '').toLowerCase();
+    const m = (row.modele_vehicule || '').toLowerCase();
+    return (!brandQ || b.includes(brandQ)) && (!modelQ || m.includes(modelQ));
+  });
+}
+
+function renderResults(){
+  const brandQ=(brandInput.value||'').trim();
+  const modelQ=(modelInput.value||'').trim();
+
+  if(!brandQ && !modelQ){
+    resultsContainer.innerHTML=''; 
+    return;
+  }
+
+  const filtered=filterData();
+  resultsContainer.innerHTML='';
+
+  if(!filtered.length){
+    resultsContainer.innerHTML=`<div class="result-card"><p class="muted">No result found.</p></div>`;
+    return;
+  }
+
+  const row=filtered[0]; // first match
+
+  // Sanitize Lishi for URL
+  let lishiSafe = row.lishi || '';
+  lishiSafe = lishiSafe.replace(/\//g,'-').trim();
+  const lishiEncoded = encodeURIComponent(lishiSafe);
+  const EntrepriseAnonymeUrl = `${baseURL}?s=${lishiEncoded}&post_type=product`;
+
+  // Build card dynamically, skipping empty/NaN fields
+  let fieldsHtml = '';
+  const fields = [
+    ['Lishi', row.lishi],
+    ['T3', row.t3],
+    ['IC Card', row.ic_card],
+    ['Silca Card', row.silca_card],
+    ['Silca Key Blank', row.silca_key_blank],
+    ['Ilca Key Blank', row.ilca_key_blank],
+    ['Ilco Key Blank', row.ilco_key_blank],
+    ['Keyline Key Blank', row.keyline_key_blank],
+    ['JMA Key Blank', row.jma_key_blank]
+  ];
+
+  for(const [label, value] of fields){
+    if(value && value.toString().trim() && value.toString().toLowerCase() !== 'nan'){
+      fieldsHtml += `<p><strong>${label}:</strong> ${escapeHtml(value)}</p>`;
+    }
+  }
+
+  const html=`<div class="result-card">
+    <h3>${escapeHtml(row.marque_vehicule)} — ${escapeHtml(row.modele_vehicule)}</h3>
+    ${fieldsHtml}
+    ${lishiSafe ? `<p style="margin-top:12px;"><a href="${EntrepriseAnonymeUrl}" target="_blank" style="display:inline-block;padding:10px 16px;background:var(--accent);color:#fff;border-radius:10px;text-decoration:none;font-weight:500;">Achat EntrepriseAnonyme</a></p>` : ''}
+  </div>`;
+
+  resultsContainer.innerHTML=html;
+}
+
+
+
+/* Init */
+function init(){
+  loadCSV();
+  const brandCandidates=()=>brands;
+  const modelCandidates=()=>computeModelPool(brandInput.value);
+  const onBrandSelect=val=>{brandInput.value=val||''; modelSug.classList.remove('show'); renderResults();};
+  const onModelSelect=val=>{modelInput.value=val||''; renderResults();};
+  wireAutocomplete(brandInput,brandSug,brandCandidates,onBrandSelect);
+  wireAutocomplete(modelInput,modelSug,modelCandidates,onModelSelect);
+  brandInput.addEventListener('input',()=>{const pool=computeModelPool(brandInput.value); const ranked=rankAndSlice(pool,modelInput.value,12); if(ranked.length) renderSuggestions(modelSug,ranked); else modelSug.classList.remove('show'); renderResults();});
+  modelInput.addEventListener('input',()=>renderResults());
+  clearBtn.addEventListener('click',()=>{brandInput.value=''; modelInput.value=''; brandSug.classList.remove('show'); modelSug.classList.remove('show'); renderResults();});
+}
+
+init();
+</script>
+</body>
+<footer style="text-align:center;margin-top:32px;padding:12px 0;font-size:13px;color:var(--muted);">
+  Thanks to <a href="${baseURL}wp-content/uploads/2025/09/Lishis-2025-EntrepriseAnonyme.pdf" target="_blank" style="color:var(--accent);text-decoration:none;">EntrepriseAnonyme</a> for providing the data.
+</footer>
+</html>
