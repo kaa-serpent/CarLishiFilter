@@ -27,21 +27,19 @@ Les données proviennent de EntrepriseAnonyme et sont basées sur leur document 
 
 ## 📊 Données
 
-Les données sont stockées dans le fichier `data.csv`.
+Les données sont stockées dans le fichier `data.js` sous la forme d'un tableau d'objets JavaScript. Chaque objet représente un véhicule et possède les propriétés suivantes :
 
-| Colonne             | Description                       |
-| ------------------- | --------------------------------- |
-| `marque_vehicule`   | Marque du véhicule                |
-| `modele_vehicule`   | Modèle du véhicule                |
-| `lishi`             | Code de l'outil Lishi             |
-| `t3`                | Code T3                           |
-| `ic_card`           | Code de la carte IC               |
-| `silca_card`        | Code de la carte Silca            |
-| `silca_key_blank`   | Ébauche de clé Silca              |
-| `ilca_key_blank`    | Ébauche de clé Ilca               |
-| `ilco_key_blank`    | Ébauche de clé Ilco               |
-| `keyline_key_blank` | Ébauche de clé Keyline            |
-| `jma_key_blank`     | Ébauche de clé JMA                |
+*   `marque_vehicule`: Marque du véhicule
+*   `modele_vehicule`: Modèle du véhicule
+*   `lishi`: Code de l'outil Lishi
+*   `t3`: Code T3
+*   `ic_card`: Code de la carte IC
+*   `silca_card`: Code de la carte Silca
+*   `silca_key_blank`: Ébauche de clé Silca
+*   `ilca_key_blank`: Ébauche de clé Ilca
+*   `ilco_key_blank`: Ébauche de clé Ilco
+*   `keyline_key_blank`: Ébauche de clé Keyline
+*   `jma_key_blank`: Ébauche de clé JMA
 
 ---
 
@@ -55,13 +53,13 @@ Toute utilisation publique ou commerciale des données EntrepriseAnonyme requier
 
 Ce dépôt est destiné à un usage local et privé uniquement.
 
-un jeux de donnée fictif est disponible `data-test.csv` pour la structure du projet
+un jeux de donnée fictif est disponible `data-test.js` pour la structure du projet
 
 Pour une utilisation optimal merci de changer la valeur de l'url ```const baseURL = 'https://lien-fictif.com/';``` dans `index.html` par l'url du site.
 
 ## 📦 Dépendances
 
-Cet outil utilise [PapaParse](https://www.papaparse.com/) pour l'analyse des fichiers CSV, qui est inclus via un lien CDN. Aucune installation locale n'est requise.
+Ce projet n'a aucune dépendance externe.
 
 ---
 
