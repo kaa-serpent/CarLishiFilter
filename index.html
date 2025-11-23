@@ -19,9 +19,7 @@
 html,body{margin:0;padding:0;background:var(--bg);color:#0b1220;}
 .container{max-width:800px;margin:36px auto;padding:20px;}
 @media (max-width: 800px) {
-  .container {
-    margin: 12px;
-  }
+  .container { margin: 12px; }
 }
 .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:16px;}
 
@@ -56,16 +54,9 @@ input[type="search"]:focus{box-shadow:0 4px 14px rgba(15,108,255,0.08);border-co
 .result-card .muted{color:var(--muted);font-size:13px;}
 
 @media (max-width:350px){
-  .container{
-    padding:10px;
-  }
-  .filters{
-    flex-direction:column;
-    gap:10px; /* reduce vertical space between inputs */
-  }
-  .filter-item{
-    width:100%;
-  }
+  .container{ padding:10px; }
+  .filters{ flex-direction:column; gap:10px; }
+  .filter-item{ width:100%; }
 }
 </style>
 </head>
@@ -94,11 +85,14 @@ input[type="search"]:focus{box-shadow:0 4px 14px rgba(15,108,255,0.08);border-co
   <div id="resultsContainer"></div>
 </div>
 
-<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="data.js"></script>
+
 <script>
+
+const baseURL = 'https://lien-fictif.com/';
 const $ = s=>document.querySelector(s);
 const $$ = s=>Array.from(document.querySelectorAll(s));
-const baseURL = 'https://lien-fictif.com/';
+
 function escapeHtml(s){return s==null?'':String(s);}
 function debounce(fn, wait=150){let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; }
 function rankAndSlice(list, term, limit=12){
@@ -112,36 +106,24 @@ function rankAndSlice(list, term, limit=12){
   return starts.concat(includes).slice(0,limit);
 }
 
-let data=[],brands=[],allModels=[],modelsByBrand={};
+let brands=[],allModels=[],modelsByBrand={};
 const brandInput=$('#brandInput'),modelInput=$('#modelInput');
 const brandSug=$('#brandSuggestions'),modelSug=$('#modelSuggestions');
 const resultsContainer=$('#resultsContainer');
 const clearBtn=$('#clearBtn');
 
-function loadCSV(){
-  Papa.parse('data.csv',{download:true,header:true,skipEmptyLines:true,
-    complete:res=>{
-      data=res.data.map(r=>normalizeRow(r));
-      buildIndexes();
-      renderResults();
-    },
-    error:err=>{
-      resultsContainer.innerHTML='<div class="muted">CSV load error. Check file exists.</div>';
-      console.error(err);
-    }
-  });
-}
 function normalizeRow(r){
   const cols=['marque_vehicule','modele_vehicule','lishi','t3','ic_card','silca_card','silca_key_blank','ilca_key_blank','ilco_key_blank','keyline_key_blank','jma_key_blank'];
   const out={};
   for(const c of cols) out[c]=(r[c]||'').trim();
   return out;
 }
+
 function buildIndexes(){
-  const bset=new Set(),mset=new Set();
+  const bset=new Set(), mset=new Set();
   modelsByBrand={};
   for(const row of data){
-    const b=row.marque_vehicule||'',m=row.modele_vehicule||'';
+    const b=row.marque_vehicule||'', m=row.modele_vehicule||'';
     if(b) bset.add(b);
     if(m) mset.add(m);
     if(!modelsByBrand[b]) modelsByBrand[b]=new Set();
@@ -151,11 +133,10 @@ function buildIndexes(){
   allModels=Array.from(mset).sort((a,b)=>a.localeCompare(b));
   for(const k in modelsByBrand) modelsByBrand[k]=Array.from(modelsByBrand[k]).sort((a,b)=>a.localeCompare(b));
 }
-
 function computeModelPool(brandTyped){
   const t = (brandTyped || '').trim().toLowerCase();
   if(!t) return allModels;
-  const exact = brands.find(b => b.toLowerCase() === t); // case-insensitive match
+  const exact = brands.find(b => b.toLowerCase() === t);
   if(exact) return modelsByBrand[exact] || [];
   const matchingBrands = brands.filter(b => b.toLowerCase().includes(t));
   if(matchingBrands.length === 0) return allModels.filter(m => m.toLowerCase().includes(t));
@@ -168,7 +149,10 @@ function renderSuggestions(container,items,activeIndex=-1){
   container.innerHTML='';
   if(!items||!items.length){container.classList.remove('show');return;}
   for(let i=0;i<items.length;i++){
-    const div=document.createElement('div'); div.className='item'+(i===activeIndex?' active':''); div.textContent=items[i]; div.dataset.index=i;
+    const div=document.createElement('div'); 
+    div.className='item'+(i===activeIndex?' active':''); 
+    div.textContent=items[i]; 
+    div.dataset.index=i;
     container.appendChild(div);
   }
   container.classList.add('show');
@@ -202,11 +186,9 @@ function wireAutocomplete(inputEl,sugEl,getCandidatesFn,onSelect){
   document.addEventListener('click',ev=>{if(!inputEl.contains(ev.target)&&!sugEl.contains(ev.target)) close();});
   return {close,open:(list)=>open(list)};
 }
-
 function filterData(){
   const brandQ = (brandInput.value || '').trim().toLowerCase();
   const modelQ = (modelInput.value || '').trim().toLowerCase();
-
   return data.filter(row=>{
     const b = (row.marque_vehicule || '').toLowerCase();
     const m = (row.modele_vehicule || '').toLowerCase();
@@ -217,11 +199,7 @@ function filterData(){
 function renderResults(){
   const brandQ=(brandInput.value||'').trim();
   const modelQ=(modelInput.value||'').trim();
-
-  if(!brandQ && !modelQ){
-    resultsContainer.innerHTML=''; 
-    return;
-  }
+  if(!brandQ && !modelQ){ resultsContainer.innerHTML=''; return; }
 
   const filtered=filterData();
   resultsContainer.innerHTML='';
@@ -231,15 +209,12 @@ function renderResults(){
     return;
   }
 
-  const row=filtered[0]; // first match
-
-  // Sanitize Lishi for URL
+  const row=filtered[0];
   let lishiSafe = row.lishi || '';
   lishiSafe = lishiSafe.replace(/\//g,'-').trim();
   const lishiEncoded = encodeURIComponent(lishiSafe);
   const EntrepriseAnonymeUrl = `${baseURL}?s=${lishiEncoded}&post_type=product`;
 
-  // Build card dynamically, skipping empty/NaN fields
   let fieldsHtml = '';
   const fields = [
     ['Lishi', row.lishi],
@@ -268,26 +243,27 @@ function renderResults(){
   resultsContainer.innerHTML=html;
 }
 
-
-
-/* Init */
 function init(){
-  loadCSV();
+  data.forEach((r,i)=>data[i]=normalizeRow(r));
+  buildIndexes();
+
   const brandCandidates=()=>brands;
   const modelCandidates=()=>computeModelPool(brandInput.value);
   const onBrandSelect=val=>{brandInput.value=val||''; modelSug.classList.remove('show'); renderResults();};
   const onModelSelect=val=>{modelInput.value=val||''; renderResults();};
+
   wireAutocomplete(brandInput,brandSug,brandCandidates,onBrandSelect);
   wireAutocomplete(modelInput,modelSug,modelCandidates,onModelSelect);
+
   brandInput.addEventListener('input',()=>{const pool=computeModelPool(brandInput.value); const ranked=rankAndSlice(pool,modelInput.value,12); if(ranked.length) renderSuggestions(modelSug,ranked); else modelSug.classList.remove('show'); renderResults();});
   modelInput.addEventListener('input',()=>renderResults());
   clearBtn.addEventListener('click',()=>{brandInput.value=''; modelInput.value=''; brandSug.classList.remove('show'); modelSug.classList.remove('show'); renderResults();});
+
+  renderResults();
 }
 
-init();
+document.addEventListener('DOMContentLoaded', init);
 </script>
+
 </body>
-<footer style="text-align:center;margin-top:32px;padding:12px 0;font-size:13px;color:var(--muted);">
-  Thanks to <a href="${baseURL}wp-content/uploads/2025/09/Lishis-2025-EntrepriseAnonyme.pdf" target="_blank" style="color:var(--accent);text-decoration:none;">EntrepriseAnonyme</a> for providing the data.
-</footer>
 </html>
