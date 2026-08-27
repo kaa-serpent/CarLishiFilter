@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/portfolio-preview.webp" alt="CarLishiFilter — recherche locale de références automobiles" width="100%">
+</p>
+
 # 🚗 Filtre Lishi pour Clés de Véhicule
 
 Ceci est un outil web simple pour filtrer et trouver rapidement des informations sur les clés de véhicule, en particulier les codes d'outils Lishi, en se basant sur la marque et le modèle du véhicule.
